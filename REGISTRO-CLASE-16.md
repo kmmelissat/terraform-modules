@@ -58,3 +58,27 @@ Comando: `terraform init -migrate-state -force-copy -backend-config=backend.hcl`
 Después de migrar, `terraform plan` → `No changes.`
 
 **Ubicación del blob:** `sttfstate20235722` / `tfstate` / `orders-development.tfstate` (Resource Group `rg-tfstate-dev`).
+
+## Parte C – Separar los ambientes
+
+Estructura:
+
+```
+modules/network/          main, variables, outputs, versions.tf
+environments/
+├── development/          main, variables, outputs, backend.tf, backend.hcl, terraform.tfvars
+└── production/           igual, con key y red propias
+```
+
+El módulo de `development` usa `source = "../../modules/network"` y conserva la key ya migrada (`orders-development.tfstate`), así que no se creó una segunda copia de la infraestructura.
+
+Puntos de control (`terraform init -backend-config=backend.hcl`, `state list`, `plan`):
+
+| | development | production |
+|---|---|---|
+| Key | `orders-development.tfstate` | `orders-production.tfstate` |
+| Red | `10.10.0.0/16` | `10.20.0.0/16` |
+| `state list` | Las mismas 4 direcciones de antes de reorganizar | Vacío (state nuevo) |
+| `plan` | `No changes.` | `4 to add, 0 to change, 0 to destroy` (RG, VNet y 2 subnets) |
+
+`production` todavía no se ha aplicado.
