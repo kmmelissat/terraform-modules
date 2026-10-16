@@ -1,0 +1,9 @@
+subscription_id     = "ID_DE_LA_SUSCRIPCION"
+location            = "REGION_PERMITIDA"
+resource_group_name = "rg-orders-dev-IDENTIFICADOR"
+application_name    = "orders-platform"
+environment         = "development"
+
+additional_tags = {
+  owner = "IDENTIFICADOR"
+}
