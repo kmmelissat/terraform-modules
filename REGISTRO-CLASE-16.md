@@ -82,3 +82,41 @@ Puntos de control (`terraform init -backend-config=backend.hcl`, `state list`, `
 | `plan` | `No changes.` | `4 to add, 0 to change, 0 to destroy` (RG, VNet y 2 subnets) |
 
 `production` todavía no se ha aplicado.
+
+## Parte D – Observar el locking
+
+Se hizo sobre `environments/development`. Cambio temporal en `terraform.tfvars` (ya revertido):
+
+```hcl
+additional_tags = {
+  owner      = "platform-team"
+  experiment = "locking"
+}
+```
+
+- **Terminal A:** `terraform apply` → mostró el plan y quedó esperando confirmación (mantiene el lock).
+- **Terminal B:** `terraform apply -lock-timeout=10s` → falló:
+
+```
+Error: Error acquiring the state lock
+
+Error message: state blob is already locked
+Lock Info:
+  ID:        fb2500a1-cf8d-e9c5-38ea-dfdecdf610bc
+  Path:      tfstate/orders-development.tfstate
+  Operation: OperationTypeApply
+  Who:       melissasolorzano@Melissas-MacBook-Pro.local
+  Version:   1.16.6
+  Created:   2026-10-16 17:35:12.280317 +0000 UTC
+```
+
+- **Terminal A:** se respondió `no` → `Apply cancelled` y `Releasing state lock`.
+- Se retiró el cambio temporal; `terraform plan` → `No changes.`
+
+Preguntas:
+
+1. **¿Qué operación adquirió el lock?** El `apply` de la terminal A (`OperationTypeApply`), desde que mostró el plan.
+2. **¿Qué información recibió el segundo proceso?** ID del lock, ruta del blob, operación, quién lo tiene, versión de Terraform y hora de creación.
+3. **¿Por qué el segundo proceso no puede continuar aunque su configuración sea correcta?** El lock protege el state compartido, no la configuración: dos escrituras simultáneas podrían pisarse.
+4. **¿Por qué `-lock=false` elimina una protección necesaria?** Permite escrituras concurrentes sobre el mismo state, con riesgo de corrupción o pérdida de cambios.
+5. **¿Cuándo estaría justificado `force-unlock`?** Solo con un lock huérfano (el proceso murió y dejó el lock), tras verificar que ninguna ejecución legítima sigue usando ese state.
